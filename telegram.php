@@ -27,7 +27,8 @@ class TelegramOpenAI {
             "U".$message->getFrom()->getId(),
             $message->getText(),
             ["/ia", "/ai"],
-            ["?", "!"]
+            ["?", "!"],
+            300
         );
         if(!empty($answer)){
             $this->send_telegram_message($message->getChat()->getId(), $answer);
