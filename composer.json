@@ -1,9 +1,0 @@
-{
-    "require": {
-        "orhanerday/open-ai": "^4.7",
-        "telegram-bot/api": "^2.3"
-    },
-    "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.16"
-    }
-}
