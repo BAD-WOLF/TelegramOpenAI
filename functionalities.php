@@ -1,9 +1,9 @@
 <?php
-
 namespace Functionalities;
-require_once "MsgTelegram.php";
 
-use MsgTelegram\MsgTelegram;
+require_once "reply_telegram.php";
+
+use ReplyTelegram\ReplyTelegram;
 
 class Functionalities {
     private static int     $chat_id;
@@ -12,15 +12,21 @@ class Functionalities {
 
     public static function initialize(int $chat_id, string $prompt, string $marking){
         self::$chat_id = $chat_id;
-        self::$prompt    = $prompt;
+        self::$prompt  = $prompt;
         self::$marking = $marking;
         self::DirectionTo();
     }
 
     private static function DirectionTo(){
+        $reply = new ReplyTelegram();
+        $reply::initialize(self::$chat_id, self::$prompt);
         switch (self::$marking) {
             case '/msg':
-                MsgTelegram::initialize(self::$chat_id, self::$prompt, 300);
+                $reply::reply_to_telegram_message();
+                break;
+
+            case '/imgg':
+                $reply::reply_to_telegram_photo();
                 break;
             
             default:
