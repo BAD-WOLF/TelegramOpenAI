@@ -20,7 +20,7 @@ class GenerateImage extends TelegramOpenAI {
             "size" => "256x256",
             "response_format" => "url",
         ]);
-        return json_decode($complete, true)["data"][1]["url"];
+        return json_decode($complete, true)["data"][0]["url"];
     }
 }
 ?>
