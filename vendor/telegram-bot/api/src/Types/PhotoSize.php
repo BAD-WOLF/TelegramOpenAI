@@ -19,14 +19,14 @@ class PhotoSize extends BaseType implements TypeInterface
      *
      * @var array
      */
-    static protected $requiredParams = ['file_id', 'file_unique_id', 'width', 'height'];
+    protected static $requiredParams = ['file_id', 'file_unique_id', 'width', 'height'];
 
     /**
      * {@inheritdoc}
      *
      * @var array
      */
-    static protected $map = [
+    protected static $map = [
         'file_id' => true,
         'file_unique_id' => true,
         'width' => true,
@@ -58,7 +58,7 @@ class PhotoSize extends BaseType implements TypeInterface
     /**
      * Optional. File size
      *
-     * @var int
+     * @var int|null
      */
     protected $fileSize;
 
@@ -79,6 +79,7 @@ class PhotoSize extends BaseType implements TypeInterface
 
     /**
      * @param string $fileId
+     * @return void
      */
     public function setFileId($fileId)
     {
@@ -86,7 +87,7 @@ class PhotoSize extends BaseType implements TypeInterface
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getFileSize()
     {
@@ -94,8 +95,8 @@ class PhotoSize extends BaseType implements TypeInterface
     }
 
     /**
-     * @param int $fileSize
-     *
+     * @param mixed $fileSize
+     * @return void
      * @throws InvalidArgumentException
      */
     public function setFileSize($fileSize)
@@ -116,8 +117,8 @@ class PhotoSize extends BaseType implements TypeInterface
     }
 
     /**
-     * @param int $height
-     *
+     * @param mixed $height
+     * @return void
      * @throws InvalidArgumentException
      */
     public function setHeight($height)
@@ -138,8 +139,8 @@ class PhotoSize extends BaseType implements TypeInterface
     }
 
     /**
-     * @param int $width
-     *
+     * @param mixed $width
+     * @return void
      * @throws InvalidArgumentException
      */
     public function setWidth($width)
@@ -161,6 +162,7 @@ class PhotoSize extends BaseType implements TypeInterface
 
     /**
      * @param string $fileUniqueId
+     * @return void
      */
     public function setFileUniqueId($fileUniqueId)
     {

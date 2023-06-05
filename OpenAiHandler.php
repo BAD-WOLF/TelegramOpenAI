@@ -5,24 +5,22 @@ require_once "vendor/autoload.php";
 require_once "./PromptProcessor.php";
 
 use Orhanerday\OpenAi\OpenAi;
-use \PromptProcessor\PromptProcessor;
 
 class OpenAIHandler
 {
-    private static $openai;
-    private static $model;
-    private static $users_array = [];
+    private string $prompt;
+    private OpenAi $openai;
+    private string $model;
 
-    public static function initialize($openai_key)
+    public function __construct($array_obj)
     {
-        self::$openai = new OpenAi($openai_key);
-        self::$model = "gpt-3.5-turbo";
+        $this->setOpenai(new OpenAi($array_obj["openai_key"]));
+        $this->setPrompt($array_obj["prompt"]);
+        $this->setModel("gpt-3.5-turbo");
     }
 
-    public static function prepare(
+    public function prepare(
         string $user,
-        string $prompt,
-        string|array $marking = "/ia",
         int $conclusion_length = 100
     ){
         try {
@@ -38,16 +36,16 @@ class OpenAIHandler
                 "content" => "you are a scientist."
              ];
              */
-            $_SESSION[$user][] = [
+            $_CHAT[$user][] = [
                 "role" => "user",
-                "content" => $prompt
+                "content" => $this->getPrompt()
             ];
-            
+
 
             $max_tokens = $conclusion_length * 2;
-            $response = self::$openai->chat([
-                'model' => self::$model,
-                'messages' => $_SESSION[$user],
+            $response = $this->openai->chat([
+                'model' => $this->getModel(),
+                'messages' => $_CHAT[$user],
                 'max_tokens' => $max_tokens,
                 'n' => 1,
                 'temperature' => 0,
@@ -78,6 +76,75 @@ class OpenAIHandler
             echo $e->getMessage();
             return 'Sorry, there was an error processing your question. Please try again later.';
         }
+    }
+
+    /**
+     * Gets the value of prompt
+     *
+     * @return string
+     */
+    public function getPrompt(): string
+    {
+        return $this->prompt;
+    }
+
+    /**
+     * Sets the value of prompt
+     *
+     * @param string $prompt description
+     *
+     * @return OpenAiHandler
+     */
+    public function setPrompt(string $prompt): OpenAiHandler
+    {
+        $this->prompt = $prompt;
+        return $this;
+    }
+
+    /**
+     * Gets the value of model
+     *
+     * @return string
+     */
+    public function getModel(): string
+    {
+        return $this->model;
+    }
+
+    /**
+     * Sets the value of model
+     *
+     * @param string $model description
+     *
+     * @return OpenAiHandler
+     */
+    public function setModel(string $model): OpenAiHandler
+    {
+        $this->model = $model;
+        return $this;
+    }
+
+    /**
+     * Gets the value of openai
+     *
+     * @return OpenAi
+     */
+    public function getOpenai(): OpenAi
+    {
+        return $this->openai;
+    }
+
+    /**
+     * Sets the value of openai
+     *
+     * @param OpenAi $openai description
+     *
+     * @return OpenAiHandler
+     */
+    public function setOpenai(OpenAi $openai): OpenAiHandler
+    {
+        $this->openai = $openai;
+        return $this;
     }
 }
 

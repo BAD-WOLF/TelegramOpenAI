@@ -14,15 +14,18 @@ use TelegramBot\Api\Types\ChatMember;
 use TelegramBot\Api\Types\File;
 use TelegramBot\Api\Types\ForceReply;
 use TelegramBot\Api\Types\ForumTopic;
+use TelegramBot\Api\Types\Inline\InlineKeyboardMarkup;
 use TelegramBot\Api\Types\Inline\QueryResult\AbstractInlineQueryResult;
 use TelegramBot\Api\Types\InputMedia\ArrayOfInputMedia;
 use TelegramBot\Api\Types\InputMedia\InputMedia;
 use TelegramBot\Api\Types\MaskPosition;
 use TelegramBot\Api\Types\Message;
+use TelegramBot\Api\Types\MessageId;
 use TelegramBot\Api\Types\Poll;
 use TelegramBot\Api\Types\ReplyKeyboardHide;
 use TelegramBot\Api\Types\ReplyKeyboardMarkup;
 use TelegramBot\Api\Types\ReplyKeyboardRemove;
+use TelegramBot\Api\Types\SentWebAppMessage;
 use TelegramBot\Api\Types\Sticker;
 use TelegramBot\Api\Types\StickerSet;
 use TelegramBot\Api\Types\Update;
@@ -109,6 +112,9 @@ class BotApi
         511 => 'Network Authentication Required',                             // RFC6585
     ];
 
+    /**
+     * @var array
+     */
     private $proxySettings = [];
 
     /**
@@ -139,7 +145,7 @@ class BotApi
     /**
      * CURL object
      *
-     * @var
+     * @var resource
      */
     protected $curl;
 
@@ -160,7 +166,7 @@ class BotApi
     /**
      * Botan tracker
      *
-     * @var Botan
+     * @var Botan|null
      */
     protected $tracker;
 
@@ -191,6 +197,7 @@ class BotApi
         $this->token = $token;
 
         if ($trackerToken) {
+            @trigger_error(sprintf('Passing $trackerToken to %s is deprecated', self::class), \E_USER_DEPRECATED);
             $this->tracker = new Botan($trackerToken);
         }
     }
@@ -209,12 +216,12 @@ class BotApi
         return $this;
     }
 
-
     /**
      * Call method
      *
      * @param string $method
      * @param array|null $data
+     * @param int $timeout
      *
      * @return mixed
      * @throws Exception
@@ -236,13 +243,13 @@ class BotApi
             $options[CURLOPT_POSTFIELDS] = $data;
         }
 
-        if (!empty($this->customCurlOptions) && is_array($this->customCurlOptions)) {
+        if (!empty($this->customCurlOptions)) {
             $options = $this->customCurlOptions + $options;
         }
 
         $response = self::jsonValidate($this->executeCurl($options), $this->returnArray);
 
-        if ($this->returnArray) {
+        if (\is_array($response)) {
             if (!isset($response['ok']) || !$response['ok']) {
                 throw new Exception($response['description'], $response['error_code']);
             }
@@ -270,6 +277,7 @@ class BotApi
     {
         curl_setopt_array($this->curl, $options);
 
+        /** @var string|false $result */
         $result = curl_exec($this->curl);
         self::curlValidate($this->curl, $result);
         if ($result === false) {
@@ -283,12 +291,19 @@ class BotApi
      * Response validation
      *
      * @param resource $curl
-     * @param string $response
+     * @param string|false|null $response
+     *
      * @throws HttpException
+     *
+     * @return void
      */
     public static function curlValidate($curl, $response = null)
     {
-        $json = json_decode($response, true)?: [];
+        if ($response) {
+            $json = json_decode($response, true) ?: [];
+        } else {
+            $json = [];
+        }
         if (($httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE))
             && !in_array($httpCode, [self::DEFAULT_STATUS_CODE, self::NOT_MODIFIED_STATUS_CODE])
         ) {
@@ -302,7 +317,7 @@ class BotApi
      * JSON validation
      *
      * @param string $jsonString
-     * @param boolean $asArray
+     * @param bool $asArray
      *
      * @return object|array
      * @throws InvalidJsonException
@@ -321,14 +336,14 @@ class BotApi
     /**
      * Use this method to send text messages. On success, the sent \TelegramBot\Api\Types\Message is returned.
      *
-     * @param int|string $chatId
+     * @param int|float|string $chatId
      * @param string $text
      * @param string|null $parseMode
      * @param bool $disablePreview
-     * @param int|null $messageThreadId
      * @param int|null $replyToMessageId
-     * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
+     * @param InlineKeyboardMarkup|ReplyKeyboardMarkup|ReplyKeyboardHide|ReplyKeyboardRemove|ForceReply|null $replyMarkup
      * @param bool $disableNotification
+     * @param int|null $messageThreadId
      *
      * @return Message
      * @throws InvalidArgumentException
@@ -339,10 +354,10 @@ class BotApi
         $text,
         $parseMode = null,
         $disablePreview = false,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $replyMarkup = null,
-        $disableNotification = false
+        $disableNotification = false,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendMessage', [
             'chat_id' => $chatId,
@@ -364,12 +379,12 @@ class BotApi
      * @param string|null $parseMode
      * @param ArrayOfMessageEntity|null $captionEntities
      * @param bool $disableNotification
-     * @param int|null $messageThreadId
      * @param int|null $replyToMessageId
      * @param bool $allowSendingWithoutReply
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
+     * @param int|null $messageThreadId
      *
-     * @return Message
+     * @return MessageId
      * @throws Exception
      * @throws HttpException
      * @throws InvalidJsonException
@@ -382,12 +397,12 @@ class BotApi
         $parseMode = null,
         $captionEntities = null,
         $disableNotification = false,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $allowSendingWithoutReply = false,
-        $replyMarkup = null
+        $replyMarkup = null,
+        $messageThreadId = null
     ) {
-        return Message::fromResponse($this->call('copyMessage', [
+        return MessageId::fromResponse($this->call('copyMessage', [
             'chat_id' => $chatId,
             'from_chat_id' => $fromChatId,
             'message_id' => (int)$messageId,
@@ -409,10 +424,10 @@ class BotApi
      * @param string $phoneNumber
      * @param string $firstName
      * @param string $lastName
-     * @param int|null $messageThreadId
      * @param int|null $replyToMessageId
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      * @param bool $disableNotification
+     * @param int|null $messageThreadId
      *
      * @return Message
      * @throws Exception
@@ -422,10 +437,10 @@ class BotApi
         $phoneNumber,
         $firstName,
         $lastName = null,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $replyMarkup = null,
-        $disableNotification = false
+        $disableNotification = false,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendContact', [
             'chat_id' => $chatId,
@@ -493,20 +508,20 @@ class BotApi
      * @param string $url HTTPS url to send updates to. Use an empty string to remove webhook integration
      * @param \CURLFile|string $certificate Upload your public key certificate
      *                                      so that the root certificate in use can be checked
-     * @param string|null $ip_address The fixed IP address which will be used to send webhook requests
+     * @param string|null $ipAddress The fixed IP address which will be used to send webhook requests
      *                                instead of the IP address resolved through DNS
-     * @param int|null $max_connections The maximum allowed number of simultaneous HTTPS connections to the webhook
+     * @param int|null $maxConnections The maximum allowed number of simultaneous HTTPS connections to the webhook
      *                                  for update delivery, 1-100. Defaults to 40. Use lower values to limit
      *                                  the load on your bot's server, and higher values to increase your bot's throughput.
-     * @param array|null $allowed_updates A JSON-serialized list of the update types you want your bot to receive.
+     * @param array|null $allowedUpdates A JSON-serialized list of the update types you want your bot to receive.
      *                                    For example, specify [“message”, “edited_channel_post”, “callback_query”]
      *                                   to only receive updates of these types. See Update for a complete list of available update types.
      *                                   Specify an empty list to receive all update types except chat_member (default).
      *                                   If not specified, the previous setting will be used.
      *                                   Please note that this parameter doesn't affect updates created before the call to the setWebhook,
      *                                   so unwanted updates may be received for a short period of time.
-     * @param bool|null $drop_pending_updates Pass True to drop all pending updates
-     * @param string|null $secret_token A secret token to be sent in a header “X-Telegram-Bot-Api-Secret-Token” in every webhook request,
+     * @param bool|null $dropPendingUpdates Pass True to drop all pending updates
+     * @param string|null $secretToken A secret token to be sent in a header “X-Telegram-Bot-Api-Secret-Token” in every webhook request,
      *                                  1-256 characters. Only characters A-Z, a-z, 0-9, _ and - are allowed.
      *                                  The header is useful to ensure that the request comes from a webhook set by you.
      *
@@ -517,36 +532,35 @@ class BotApi
     public function setWebhook(
         $url = '',
         $certificate = null,
-        $ip_address = null,
-        $max_connections = 40,
-        $allowed_updates = null,
-        $drop_pending_updates = false,
-        $secret_token = null
+        $ipAddress = null,
+        $maxConnections = 40,
+        $allowedUpdates = null,
+        $dropPendingUpdates = false,
+        $secretToken = null
     ) {
         return $this->call('setWebhook', [
             'url' => $url,
             'certificate' => $certificate,
-            'ip_address' => $ip_address,
-            'max_connections' => $max_connections,
-            'allowed_updates' => $allowed_updates,
-            'drop_pending_updates' => $drop_pending_updates,
-            'secret_token' => $secret_token
+            'ip_address' => $ipAddress,
+            'max_connections' => $maxConnections,
+            'allowed_updates' => $allowedUpdates,
+            'drop_pending_updates' => $dropPendingUpdates,
+            'secret_token' => $secretToken
         ]);
     }
-
 
     /**
      * Use this method to clear webhook and use getUpdates again!
      *
-     * @param bool $drop_pending_updates Pass True to drop all pending updates
+     * @param bool $dropPendingUpdates Pass True to drop all pending updates
      *
      * @return mixed
      *
      * @throws Exception
      */
-    public function deleteWebhook($drop_pending_updates = false)
+    public function deleteWebhook($dropPendingUpdates = false)
     {
-        return $this->call('deleteWebhook', ['drop_pending_updates' => $drop_pending_updates]);
+        return $this->call('deleteWebhook', ['drop_pending_updates' => $dropPendingUpdates]);
     }
 
     /**
@@ -615,12 +629,11 @@ class BotApi
      * @param int|string $chatId
      * @param float $latitude
      * @param float $longitude
-     * @param int|null $messageThreadId
      * @param int|null $replyToMessageId
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      * @param bool $disableNotification
-     *
      * @param null|int $livePeriod
+     * @param int|null $messageThreadId
      *
      * @return Message
      *
@@ -630,11 +643,11 @@ class BotApi
         $chatId,
         $latitude,
         $longitude,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $replyMarkup = null,
         $disableNotification = false,
-        $livePeriod = null
+        $livePeriod = null,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendLocation', [
             'chat_id'              => $chatId,
@@ -650,6 +663,7 @@ class BotApi
 
     /**
      * Use this method to edit live location messages sent by the bot or via the bot (for inline bots).
+     * On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
      *
      * @param int|string                                                              $chatId
      * @param int                                                                     $messageId
@@ -658,7 +672,7 @@ class BotApi
      * @param float                                                                   $longitude
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      *
-     * @return Message
+     * @return Message|true
      *
      * @throws Exception
      */
@@ -670,26 +684,32 @@ class BotApi
         $longitude,
         $replyMarkup = null
     ) {
-        return Message::fromResponse($this->call('sendLocation', [
+        $response = $this->call('editMessageLiveLocation', [
             'chat_id'           => $chatId,
             'message_id'        => $messageId,
             'inline_message_id' => $inlineMessageId,
             'latitude'          => $latitude,
             'longitude'         => $longitude,
             'reply_markup'      => is_null($replyMarkup) ? $replyMarkup : $replyMarkup->toJson(),
-        ]));
+        ]);
+        if ($response === true) {
+            return true;
+        }
+
+        return Message::fromResponse($response);
     }
 
     /**
      * Use this method to stop updating a live location message sent by the bot or via the bot (for inline bots) before
      * live_period expires.
+     * On success, if the message is not an inline message, the edited Message is returned, otherwise True is returned.
      *
      * @param int|string                                                              $chatId
      * @param int                                                                     $messageId
      * @param string                                                                  $inlineMessageId
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      *
-     * @return Message
+     * @return Message|true
      *
      * @throws Exception
      */
@@ -699,12 +719,17 @@ class BotApi
         $inlineMessageId,
         $replyMarkup = null
     ) {
-        return Message::fromResponse($this->call('sendLocation', [
+        $response = $this->call('stopMessageLiveLocation', [
             'chat_id'           => $chatId,
             'message_id'        => $messageId,
             'inline_message_id' => $inlineMessageId,
             'reply_markup'      => is_null($replyMarkup) ? $replyMarkup : $replyMarkup->toJson(),
-        ]));
+        ]);
+        if ($response === true) {
+            return true;
+        }
+
+        return Message::fromResponse($response);
     }
 
     /**
@@ -716,10 +741,10 @@ class BotApi
      * @param string $title
      * @param string $address
      * @param string|null $foursquareId
-     * @param int|null $messageThreadId
      * @param int|null $replyToMessageId
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      * @param bool $disableNotification
+     * @param int|null $messageThreadId
      *
      * @return Message
      * @throws Exception
@@ -731,10 +756,10 @@ class BotApi
         $title,
         $address,
         $foursquareId = null,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $replyMarkup = null,
-        $disableNotification = false
+        $disableNotification = false,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendVenue', [
             'chat_id' => $chatId,
@@ -756,10 +781,11 @@ class BotApi
      * @param int|string $chatId chat_id or @channel_name
      * @param \CURLFile|string $sticker
      * @param int|null $replyToMessageId
-     * @param null $replyMarkup
+     * @param InlineKeyboardMarkup|ReplyKeyboardMarkup|ReplyKeyboardRemove|ForceReply|null $replyMarkup
      * @param bool $disableNotification Sends the message silently. Users will receive a notification with no sound.
      * @param bool $protectContent Protects the contents of the sent message from forwarding and saving
      * @param bool $allowSendingWithoutReply Pass True if the message should be sent even if the specified replied-to message is not found
+     * @param string|null $messageThreadId
      *
      * @return Message
      * @throws InvalidArgumentException
@@ -768,12 +794,12 @@ class BotApi
     public function sendSticker(
         $chatId,
         $sticker,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $replyMarkup = null,
         $disableNotification = false,
         $protectContent = false,
-        $allowSendingWithoutReply = false
+        $allowSendingWithoutReply = false,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendSticker', [
             'chat_id' => $chatId,
@@ -789,7 +815,7 @@ class BotApi
 
     /**
      * @param string $name Name of the sticker set
-     *
+     * @return StickerSet
      * @throws InvalidArgumentException
      * @throws Exception
      */
@@ -803,7 +829,7 @@ class BotApi
     /**
      * @param array[] $customEmojiIds List of custom emoji identifiers.
      *                                  At most 200 custom emoji identifiers can be specified.
-     *
+     * @return StickerSet
      * @throws InvalidArgumentException
      * @throws Exception
      *
@@ -866,6 +892,8 @@ class BotApi
      * @throws InvalidArgumentException
      * @throws Exception
      *
+     * @return bool
+     *
      * @author bernard-ng <bernard@devscast.tech>
      */
     public function createNewStickerSet(
@@ -899,8 +927,17 @@ class BotApi
      * Animated sticker sets can have up to 50 stickers.
      * Static sticker sets can have up to 120 stickers. Returns True on success.
      *
-     * @throws InvalidArgumentException
+     * @param string $userId
+     * @param string $name
+     * @param string $emojis
+     * @param string $pngSticker
+     * @param string|null $tgsSticker
+     * @param string|null $webmSticker
+     * @param MaskPosition|null $maskPosition
+     * @return bool
      * @throws Exception
+     * @throws HttpException
+     * @throws InvalidJsonException
      */
     public function addStickerToSet(
         $userId,
@@ -975,12 +1012,12 @@ class BotApi
      * @param \CURLFile|string $video
      * @param int|null $duration
      * @param string|null $caption
-     * @param int|null $messageThreadId
      * @param int|null $replyToMessageId
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      * @param bool $disableNotification
      * @param bool $supportsStreaming Pass True, if the uploaded video is suitable for streaming
      * @param string|null $parseMode
+     * @param int|null $messageThreadId
      *
      * @return Message
      * @throws InvalidArgumentException
@@ -991,12 +1028,12 @@ class BotApi
         $video,
         $duration = null,
         $caption = null,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $replyMarkup = null,
         $disableNotification = false,
         $supportsStreaming = false,
-        $parseMode = null
+        $parseMode = null,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendVideo', [
             'chat_id' => $chatId,
@@ -1021,11 +1058,11 @@ class BotApi
      * @param \CURLFile|string $animation
      * @param int|null $duration
      * @param string|null $caption
-     * @param int|null $messageThreadId
      * @param int|null $replyToMessageId
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      * @param bool $disableNotification
-     * @param string|null $parseMode
+     * @param string|null $parseMode,
+     * @param int|null $messageThreadId
      *
      * @return Message
      * @throws InvalidArgumentException
@@ -1036,11 +1073,11 @@ class BotApi
         $animation,
         $duration = null,
         $caption = null,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $replyMarkup = null,
         $disableNotification = false,
-        $parseMode = null
+        $parseMode = null,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendAnimation', [
             'chat_id' => $chatId,
@@ -1067,13 +1104,13 @@ class BotApi
      * @param \CURLFile|string $voice
      * @param string $caption Voice message caption, 0-1024 characters after entities parsing
      * @param int|null $duration
-     * @param int|null $messageThreadId
      * @param int|null $replyToMessageId
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      * @param bool $disableNotification
      * @param bool $allowSendingWithoutReply Pass True, if the message should be sent even if the specified
      *     replied-to message is not found
      * @param string|null $parseMode
+     * @param int|null $messageThreadId
      *
      * @return Message
      * @throws InvalidArgumentException
@@ -1084,12 +1121,12 @@ class BotApi
         $voice,
         $caption = null,
         $duration = null,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $replyMarkup = null,
         $disableNotification = false,
         $allowSendingWithoutReply = false,
-        $parseMode = null
+        $parseMode = null,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendVoice', [
             'chat_id' => $chatId,
@@ -1111,10 +1148,10 @@ class BotApi
      *
      * @param int|string $chatId Unique identifier for the target chat or username of the target channel (in the format @channelusername)
      * @param int $fromChatId Unique identifier for the chat where the original message was sent (or channel username in the format @channelusername)
-     * @param $messageId Message identifier in the chat specified in from_chat_id
-     * @param int|null $messageThreadId Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
+     * @param string $messageId Message identifier in the chat specified in from_chat_id
      * @param bool $protectContent Protects the contents of the forwarded message from forwarding and saving
      * @param bool $disableNotification Sends the message silently. Users will receive a notification with no sound.
+     * @param int|null $messageThreadId Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
      *
      * @return Message
      * @throws Exception
@@ -1125,9 +1162,9 @@ class BotApi
         $chatId,
         $fromChatId,
         $messageId,
-        $messageThreadId = null,
         $protectContent = false,
-        $disableNotification = false
+        $disableNotification = false,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('forwardMessage', [
             'chat_id' => $chatId,
@@ -1199,11 +1236,11 @@ class BotApi
      * @param int|string $chatId chat_id or @channel_name
      * @param \CURLFile|string $photo
      * @param string|null $caption
-     * @param int|null $messageThreadId
      * @param int|null $replyToMessageId
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      * @param bool $disableNotification
      * @param string|null $parseMode
+     * @param int|null $messageThreadId
      *
      * @return Message
      * @throws InvalidArgumentException
@@ -1213,11 +1250,11 @@ class BotApi
         $chatId,
         $photo,
         $caption = null,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $replyMarkup = null,
         $disableNotification = false,
-        $parseMode = null
+        $parseMode = null,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendPhoto', [
             'chat_id' => $chatId,
@@ -1236,13 +1273,13 @@ class BotApi
      * Bots can currently send files of any type of up to 50 MB in size, this limit may be changed in the future.
      *
      * @param int|string $chatId chat_id or @channel_name
-     * @param \CURLFile|string $document
+     * @param \CURLFile|\CURLStringFile|string $document
      * @param string|null $caption
-     * @param int|null $messageThreadId
      * @param int|null $replyToMessageId
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      * @param bool $disableNotification
      * @param string|null $parseMode
+     * @param int|null $messageThreadId
      *
      * @return Message
      * @throws InvalidArgumentException
@@ -1252,11 +1289,11 @@ class BotApi
         $chatId,
         $document,
         $caption = null,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $replyMarkup = null,
         $disableNotification = false,
-        $parseMode = null
+        $parseMode = null,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendDocument', [
             'chat_id' => $chatId,
@@ -1279,7 +1316,7 @@ class BotApi
      * It is guaranteed that the link will be valid for at least 1 hour.
      * When the link expires, a new one can be requested by calling getFile again.
      *
-     * @param $fileId
+     * @param string $fileId
      *
      * @return File
      * @throws InvalidArgumentException
@@ -1293,7 +1330,7 @@ class BotApi
     /**
      * Get file contents via cURL
      *
-     * @param $fileId
+     * @param string $fileId
      *
      * @return string
      *
@@ -1337,10 +1374,19 @@ class BotApi
         $switchPmText = null,
         $switchPmParameter = null
     ) {
-        $results = array_map(function ($item) {
-            /* @var AbstractInlineQueryResult $item */
-            return json_decode($item->toJson(), true);
-        }, $results);
+        $results = array_map(
+            /**
+             * @param AbstractInlineQueryResult $item
+             * @return array
+             */
+            function ($item) {
+                /** @var array $array */
+                $array = $item->toJson(true);
+
+                return $array;
+            },
+            $results
+        );
 
         return $this->call('answerInlineQuery', [
             'inline_query_id' => $inlineQueryId,
@@ -1402,7 +1448,7 @@ class BotApi
      * Use this method to send answers to callback queries sent from inline keyboards.
      * The answer will be displayed to the user as a notification at the top of the chat screen or as an alert.
      *
-     * @param $callbackQueryId
+     * @param string $callbackQueryId
      * @param string|null $text
      * @param bool $showAlert
      * @param string|null $url
@@ -1425,28 +1471,34 @@ class BotApi
     /**
      * Use this method to change the list of the bot's commands. Returns True on success.
      *
-     * @param $commands
+     * @param ArrayOfBotCommand|BotCommand[] $commands
+     * @param string|null $scope
+     * @param string|null $languageCode
      *
      * @return mixed
      * @throws Exception
      * @throws HttpException
      * @throws InvalidJsonException
      */
-    public function setMyCommands($commands)
+    public function setMyCommands($commands, $scope = null, $languageCode = null)
     {
-        return $this->call(
-            'setMyCommands',
-            [
-                'commands' => json_encode($commands)
-            ]
-        );
+        if (!$commands instanceof ArrayOfBotCommand) {
+            @trigger_error(sprintf('Passing array of BotCommand to "%s::%s" is deprecated. Use %s', __CLASS__, __METHOD__, ArrayOfBotCommand::class), \E_USER_DEPRECATED);
+            $commands = new ArrayOfBotCommand($commands);
+        }
+
+        return $this->call('setMyCommands', [
+            'commands' => $commands->toJson(),
+            'scope' => $scope,
+            'language_code' => $languageCode,
+        ]);
     }
 
     /**
      * Use this method to get the current list of the bot's commands. Requires no parameters.
      * Returns Array of BotCommand on success.
      *
-     * @return BotCommand[]
+     * @return ArrayOfBotCommand
      *
      * @throws Exception
      * @throws HttpException
@@ -1459,6 +1511,7 @@ class BotApi
 
     /**
      * Use this method to edit text messages sent by the bot or via the bot
+     * On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
      *
      * @param int|string $chatId
      * @param int $messageId
@@ -1468,7 +1521,7 @@ class BotApi
      * @param bool $disablePreview
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      *
-     * @return Message
+     * @return Message|true
      * @throws Exception
      */
     public function editMessageText(
@@ -1480,7 +1533,7 @@ class BotApi
         $replyMarkup = null,
         $inlineMessageId = null
     ) {
-        return Message::fromResponse($this->call('editMessageText', [
+        $response = $this->call('editMessageText', [
             'chat_id' => $chatId,
             'message_id' => $messageId,
             'text' => $text,
@@ -1488,11 +1541,17 @@ class BotApi
             'parse_mode' => $parseMode,
             'disable_web_page_preview' => $disablePreview,
             'reply_markup' => is_null($replyMarkup) ? $replyMarkup : $replyMarkup->toJson(),
-        ]));
+        ]);
+        if ($response === true) {
+            return true;
+        }
+
+        return Message::fromResponse($response);
     }
 
     /**
      * Use this method to edit text messages sent by the bot or via the bot
+     * On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
      *
      * @param int|string $chatId
      * @param int $messageId
@@ -1501,7 +1560,7 @@ class BotApi
      * @param string $inlineMessageId
      * @param string|null $parseMode
      *
-     * @return Message
+     * @return Message|true
      * @throws InvalidArgumentException
      * @throws Exception
      */
@@ -1513,14 +1572,19 @@ class BotApi
         $inlineMessageId = null,
         $parseMode = null
     ) {
-        return Message::fromResponse($this->call('editMessageCaption', [
+        $response = $this->call('editMessageCaption', [
             'chat_id' => $chatId,
             'message_id' => $messageId,
             'inline_message_id' => $inlineMessageId,
             'caption' => $caption,
             'reply_markup' => is_null($replyMarkup) ? $replyMarkup : $replyMarkup->toJson(),
             'parse_mode' => $parseMode
-        ]));
+        ]);
+        if ($response === true) {
+            return true;
+        }
+
+        return Message::fromResponse($response);
     }
 
     /**
@@ -1531,12 +1595,12 @@ class BotApi
      * Use previously uploaded file via its file_id or specify a URL.
      * On success, if the edited message was sent by the bot, the edited Message is returned, otherwise True is returned
      *
-     * @param $chatId
-     * @param $messageId
+     * @param string $chatId
+     * @param string $messageId
      * @param InputMedia $media
      * @param string|null $inlineMessageId
-     * @param string|null $replyMarkup
-     * @return bool|Message
+     * @param InlineKeyboardMarkup|null $replyMarkup
+     * @return Message|true
      *
      * @throws Exception
      * @throws HttpException
@@ -1549,24 +1613,30 @@ class BotApi
         $inlineMessageId = null,
         $replyMarkup = null
     ) {
-        return Message::fromResponse($this->call('editMessageMedia', [
+        $response = $this->call('editMessageMedia', [
             'chat_id' => $chatId,
             'message_id' => $messageId,
             'inline_message_id' => $inlineMessageId,
             'media' => $media->toJson(),
             'reply_markup' => is_null($replyMarkup) ? $replyMarkup : $replyMarkup->toJson(),
-        ]));
+        ]);
+        if ($response === true) {
+            return true;
+        }
+
+        return Message::fromResponse($response);
     }
 
     /**
      * Use this method to edit only the reply markup of messages sent by the bot or via the bot
+     * On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
      *
      * @param int|string $chatId
      * @param int $messageId
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      * @param string $inlineMessageId
      *
-     * @return Message
+     * @return Message|true
      * @throws Exception
      */
     public function editMessageReplyMarkup(
@@ -1575,12 +1645,17 @@ class BotApi
         $replyMarkup = null,
         $inlineMessageId = null
     ) {
-        return Message::fromResponse($this->call('editMessageReplyMarkup', [
+        $response = $this->call('editMessageReplyMarkup', [
             'chat_id' => $chatId,
             'message_id' => $messageId,
             'inline_message_id' => $inlineMessageId,
             'reply_markup' => is_null($replyMarkup) ? $replyMarkup : $replyMarkup->toJson(),
-        ]));
+        ]);
+        if ($response === true) {
+            return true;
+        }
+
+        return Message::fromResponse($response);
     }
 
     /**
@@ -1610,7 +1685,7 @@ class BotApi
      */
     public function __destruct()
     {
-        $this->curl && curl_close($this->curl);
+        curl_close($this->curl);
     }
 
     /**
@@ -1634,16 +1709,22 @@ class BotApi
      * @param string $eventName
      *
      * @throws Exception
+     *
+     * @return void
      */
     public function trackUpdate(Update $update, $eventName = 'Message')
     {
         if (!in_array($update->getUpdateId(), $this->trackedEvents)) {
+            $message = $update->getMessage();
+            if (!$message) {
+                return;
+            }
             $this->trackedEvents[] = $update->getUpdateId();
 
-            $this->track($update->getMessage(), $eventName);
+            $this->track($message, $eventName);
 
             if (count($this->trackedEvents) > self::MAX_TRACKED_EVENTS) {
-                $this->trackedEvents = array_slice($this->trackedEvents, round(self::MAX_TRACKED_EVENTS / 4));
+                $this->trackedEvents = array_slice($this->trackedEvents, (int) round(self::MAX_TRACKED_EVENTS / 4));
             }
         }
     }
@@ -1655,6 +1736,8 @@ class BotApi
      * @param string $eventName
      *
      * @throws Exception
+     *
+     * @return void
      */
     public function track(Message $message, $eventName = 'Message')
     {
@@ -1683,13 +1766,13 @@ class BotApi
      * @param bool $needPhoneNumber
      * @param bool $needEmail
      * @param bool $needShippingAddress
-     * @param int|null $messageThreadId
      * @param int|null $replyToMessageId
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      * @param bool $disableNotification
      * @param string|null $providerData
      * @param bool $sendPhoneNumberToProvider
      * @param bool $sendEmailToProvider
+     * @param int|null $messageThreadId
      *
      * @return Message
      * @throws Exception
@@ -1712,13 +1795,13 @@ class BotApi
         $needPhoneNumber = false,
         $needEmail = false,
         $needShippingAddress = false,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $replyMarkup = null,
         $disableNotification = false,
         $providerData = null,
         $sendPhoneNumberToProvider = false,
-        $sendEmailToProvider = false
+        $sendEmailToProvider = false,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendInvoice', [
             'chat_id' => $chatId,
@@ -1738,6 +1821,7 @@ class BotApi
             'need_phone_number' => $needPhoneNumber,
             'need_email' => $needEmail,
             'need_shipping_address' => $needShippingAddress,
+            'message_thread_id' => $messageThreadId,
             'reply_to_message_id' => $replyToMessageId,
             'reply_markup' => is_null($replyMarkup) ? $replyMarkup : $replyMarkup->toJson(),
             'disable_notification' => (bool)$disableNotification,
@@ -1754,18 +1838,18 @@ class BotApi
      *
      * @param string $shippingQueryId
      * @param bool $ok
-     * @param array $shipping_options
+     * @param array $shippingOptions
      * @param null|string $errorMessage
      *
      * @return bool
      * @throws Exception
      */
-    public function answerShippingQuery($shippingQueryId, $ok = true, $shipping_options = [], $errorMessage = null)
+    public function answerShippingQuery($shippingQueryId, $ok = true, $shippingOptions = [], $errorMessage = null)
     {
         return $this->call('answerShippingQuery', [
             'shipping_query_id' => $shippingQueryId,
             'ok' => (bool)$ok,
-            'shipping_options' => json_encode($shipping_options),
+            'shipping_options' => json_encode($shippingOptions),
             'error_message' => $errorMessage
         ]);
     }
@@ -1778,7 +1862,7 @@ class BotApi
      * @param bool $ok
      * @param null|string $errorMessage
      *
-     * @return mixed
+     * @return bool
      * @throws Exception
      */
     public function answerPreCheckoutQuery($preCheckoutQueryId, $ok = true, $errorMessage = null)
@@ -2117,10 +2201,10 @@ class BotApi
      * @param \CURLFile|string $videoNote
      * @param int|null $duration
      * @param int|null $length
-     * @param int|null $messageThreadId
      * @param int|null $replyToMessageId
      * @param ReplyKeyboardMarkup|ReplyKeyboardHide|ForceReply|ReplyKeyboardRemove|null $replyMarkup
      * @param bool $disableNotification
+     * @param int|null $messageThreadId
      *
      * @return Message
      * @throws InvalidArgumentException
@@ -2131,10 +2215,10 @@ class BotApi
         $videoNote,
         $duration = null,
         $length = null,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $replyMarkup = null,
-        $disableNotification = false
+        $disableNotification = false,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendVideoNote', [
             'chat_id' => $chatId,
@@ -2155,8 +2239,8 @@ class BotApi
      * @param int|string $chatId
      * @param ArrayOfInputMedia $media
      * @param bool $disableNotification
-     * @param int|null $messageThreadId
      * @param int|null $replyToMessageId
+     * @param int|null $messageThreadId
      *
      * @return Message[]
      * @throws Exception
@@ -2165,8 +2249,8 @@ class BotApi
         $chatId,
         $media,
         $disableNotification = false,
-        $messageThreadId = null,
-        $replyToMessageId = null
+        $replyToMessageId = null,
+        $messageThreadId = null
     ) {
         return ArrayOfMessages::fromResponse($this->call('sendMediaGroup', [
             'chat_id' => $chatId,
@@ -2181,6 +2265,7 @@ class BotApi
      * Enable proxy for curl requests. Empty string will disable proxy.
      *
      * @param string $proxyString
+     * @param bool $socks5
      *
      * @return BotApi
      */
@@ -2202,12 +2287,11 @@ class BotApi
         return $this;
     }
 
-
     /**
      * Use this method to send a native poll. A native poll can't be sent to a private chat.
      * On success, the sent \TelegramBot\Api\Types\Message is returned.
      *
-     * @param $chatId string|int Unique identifier for the target chat or username of the target channel
+     * @param string|int $chatId Unique identifier for the target chat or username of the target channel
      *                (in the format @channelusername)
      * @param string $question Poll question, 1-255 characters
      * @param array $options A JSON-serialized list of answer options, 2-10 strings 1-100 characters each
@@ -2217,12 +2301,12 @@ class BotApi
      *                          ignored for polls in quiz mode, defaults to False
      * @param string|null $correctOptionId 0-based identifier of the correct answer option, required for polls in quiz mode
      * @param bool $isClosed Pass True, if the poll needs to be immediately closed. This can be useful for poll preview.
-     * @param int|null $messageThreadId Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
      * @param bool $disableNotification Sends the message silently. Users will receive a notification with no sound.
      * @param int|null $replyToMessageId If the message is a reply, ID of the original message
      * @param object|null $replyMarkup Additional interface options. A JSON-serialized object for an inline keyboard,
      *                          custom reply keyboard, instructions to remove reply
      *                          keyboard or to force a reply from the user.
+     * @param int|null $messageThreadId Unique identifier for the target message thread (topic) of the forum; for forum supergroups only
      * @return Message
      * @throws Exception
      * @throws HttpException
@@ -2237,10 +2321,10 @@ class BotApi
         $allowsMultipleAnswers = false,
         $correctOptionId = null,
         $isClosed = false,
-        $messageThreadId = null,
         $disableNotification = false,
         $replyToMessageId = null,
-        $replyMarkup = null
+        $replyMarkup = null,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendPoll', [
             'chat_id' => $chatId,
@@ -2263,21 +2347,21 @@ class BotApi
      * On success, the sent Message is returned. (Yes, we're aware of the “proper” singular of die.
      * But it's awkward, and we decided to help it change. One dice at a time!)
      *
-     * @param      $chatId string|int Unique identifier for the target chat or username of the target channel
+     * @param string|int $chatId Unique identifier for the target chat or username of the target channel
      *                (in the format @channelusername)
-     * @param      $emoji string Emoji on which the dice throw animation is based. Currently, must be one of “🎲”,
+     * @param string $emoji Emoji on which the dice throw animation is based. Currently, must be one of “🎲”,
      *     “🎯”, “🏀”, “⚽”, or “🎰”. Dice can have values 1-6 for “🎲” and “🎯”, values 1-5 for “🏀” and “⚽”, and
      *     values 1-64 for “🎰”. Defaults to “🎲
      * @param bool $disableNotification Sends the message silently. Users will receive a notification with no sound.
-     * @param int|null $messageThreadId
      * @param string|null $replyToMessageId If the message is a reply, ID of the original message
      * @param bool $allowSendingWithoutReply Pass True, if the message should be sent even if the specified replied-to
      *     message is not found,
      * @param object|null $replyMarkup Additional interface options. A JSON-serialized object for an inline keyboard,
      *                          custom reply keyboard, instructions to remove reply
      *                          keyboard or to force a reply from the user.
+     * @param int|null $messageThreadId
      *
-     * @return bool|Message
+     * @return Message
      * @throws Exception
      * @throws HttpException
      * @throws InvalidJsonException
@@ -2286,10 +2370,10 @@ class BotApi
         $chatId,
         $emoji,
         $disableNotification = false,
-        $messageThreadId = null,
         $replyToMessageId = null,
         $allowSendingWithoutReply = false,
-        $replyMarkup = null
+        $replyMarkup = null,
+        $messageThreadId = null
     ) {
         return Message::fromResponse($this->call('sendDice', [
             'chat_id' => $chatId,
@@ -2350,8 +2434,7 @@ class BotApi
         $name,
         $iconColor,
         $iconCustomEmojiId = null
-    )
-    {
+    ) {
         return ForumTopic::fromResponse($this->call('createForumTopic', [
             'chat_id' => $chatId,
             'name' => $name,
@@ -2381,8 +2464,7 @@ class BotApi
         $messageThreadId,
         $name,
         $iconCustomEmojiId = null
-    )
-    {
+    ) {
         return $this->call('editForumTopic', [
             'chat_id' => $chatId,
             'message_thread_id' => $messageThreadId,
@@ -2490,10 +2572,29 @@ class BotApi
     }
 
     /**
+     * @param string $webAppQueryId
+     * @param AbstractInlineQueryResult $result
+     * @return SentWebAppMessage
+     * @throws Exception
+     * @throws HttpException
+     * @throws InvalidArgumentException
+     * @throws InvalidJsonException
+     */
+    public function answerWebAppQuery($webAppQueryId, $result)
+    {
+        return SentWebAppMessage::fromResponse($this->call('answerWebAppQuery', [
+            'web_app_query_id' => $webAppQueryId,
+            'result' => $result->toJson(),
+        ]));
+    }
+
+    /**
      * Set an option for a cURL transfer
      *
      * @param int $option The CURLOPT_XXX option to set
      * @param mixed $value The value to be set on option
+     *
+     * @return void
      */
     public function setCurlOption($option, $value)
     {
@@ -2504,6 +2605,8 @@ class BotApi
      * Unset an option for a cURL transfer
      *
      * @param int $option The CURLOPT_XXX option to unset
+     *
+     * @return void
      */
     public function unsetCurlOption($option)
     {
@@ -2512,6 +2615,8 @@ class BotApi
 
     /**
      * Clean custom options
+     *
+     * @return void
      */
     public function resetCurlOptions()
     {

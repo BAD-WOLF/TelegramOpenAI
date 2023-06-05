@@ -19,7 +19,6 @@ use TelegramBot\Api\TypeInterface;
  */
 class MessageEntity extends BaseType implements TypeInterface
 {
-
     const TYPE_MENTION = 'mention';
     const TYPE_HASHTAG = 'hashtag';
     const TYPE_CASHTAG = 'cashtag';
@@ -42,14 +41,14 @@ class MessageEntity extends BaseType implements TypeInterface
      *
      * @var array
      */
-    static protected $requiredParams = ['type', 'offset', 'length'];
+    protected static $requiredParams = ['type', 'offset', 'length'];
 
     /**
      * {@inheritdoc}
      *
      * @var array
      */
-    static protected $map = [
+    protected static $map = [
         'type' => true,
         'offset' => true,
         'length' => true,
@@ -87,21 +86,21 @@ class MessageEntity extends BaseType implements TypeInterface
     /**
      * Optional. For “text_link” only, url that will be opened after user taps on the text
      *
-     * @var string
+     * @var string|null
      */
     protected $url;
 
     /**
      * Optional. For “text_mention” only, the mentioned user
      *
-     * @var User
+     * @var User|null
      */
     protected $user;
 
     /**
      * Optional. For “pre” only, the programming language of the entity text
      *
-     * @var string
+     * @var string|null
      */
     protected $language;
 
@@ -109,7 +108,7 @@ class MessageEntity extends BaseType implements TypeInterface
      * Optional. For “custom_emoji” only, unique identifier of the custom emoji.
      * Use getCustomEmojiStickers to get full information about the sticker
      *
-     * @var string
+     * @var string|null
      */
     protected $customEmojiId;
 
@@ -123,6 +122,7 @@ class MessageEntity extends BaseType implements TypeInterface
 
     /**
      * @param string $type
+     * @return void
      */
     public function setType($type)
     {
@@ -139,6 +139,7 @@ class MessageEntity extends BaseType implements TypeInterface
 
     /**
      * @param int $offset
+     * @return void
      */
     public function setOffset($offset)
     {
@@ -155,6 +156,7 @@ class MessageEntity extends BaseType implements TypeInterface
 
     /**
      * @param int $length
+     * @return void
      */
     public function setLength($length)
     {
@@ -162,7 +164,7 @@ class MessageEntity extends BaseType implements TypeInterface
     }
 
     /**
-     * @return string
+     * @return null|string
      */
     public function getUrl()
     {
@@ -171,6 +173,7 @@ class MessageEntity extends BaseType implements TypeInterface
 
     /**
      * @param string $url
+     * @return void
      */
     public function setUrl($url)
     {
@@ -178,7 +181,7 @@ class MessageEntity extends BaseType implements TypeInterface
     }
 
     /**
-     * @return User
+     * @return User|null
      */
     public function getUser()
     {
@@ -187,6 +190,7 @@ class MessageEntity extends BaseType implements TypeInterface
 
     /**
      * @param User $user
+     * @return void
      */
     public function setUser($user)
     {
@@ -194,7 +198,7 @@ class MessageEntity extends BaseType implements TypeInterface
     }
 
     /**
-     * @return string
+     * @return null|string
      */
     public function getLanguage()
     {
@@ -203,6 +207,7 @@ class MessageEntity extends BaseType implements TypeInterface
 
     /**
      * @param string $language
+     * @return void
      */
     public function setLanguage($language)
     {
@@ -210,7 +215,7 @@ class MessageEntity extends BaseType implements TypeInterface
     }
 
     /**
-     * @return string
+     * @return null|string
      */
     public function getCustomEmojiId()
     {
@@ -219,6 +224,7 @@ class MessageEntity extends BaseType implements TypeInterface
 
     /**
      * @param string $customEmojiId
+     * @return void
      */
     public function setCustomEmojiId($customEmojiId)
     {

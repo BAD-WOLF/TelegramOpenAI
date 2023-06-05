@@ -35,18 +35,39 @@ class TerminalTelegram {
         //     system("clear");
         // }
         date_default_timezone_set('America/Bahia');
-        print "\n____________________________________________";
-        print "\n| real time:     |".date("Y-m-d H:i")."     ";
-        print "\n| first Name:    |".self::$firstName."      ";
-        print "\n| user name:     |".self::$username."       ";
-        print "\n| language Code: |".self::$languageCode."   ";
-        print "\n| from Id:       |".self::$fromId."         ";
-        print "\n| chat Id:       |".self::$chatId."         ";
-        print "\n| marking:       |".self::$marking."        ";
-        print "\n| prompt:        |".self::$prompt."         ";
-        print "\n| response:      |".self::$response."       ";
-        print "\n__________________________________________";
+            $p[] = "•––––––––––––––––––––––––––––––––––––-––-––•";
+            $p[] = "•                TELEGRAM                  •";
+            $p[] = "•__________________________________________•";
+            $p[] = "| real time:     |".date("Y-m-d H:i")."     ";
+            $p[] = "|-------------------------------------------";
+            $p[] = "| first Name:    |".self::$firstName."      ";
+            $p[] = "|-------------------------------------------";
+            $p[] = "| user name:     |".self::$username."       ";
+            $p[] = "|-------------------------------------------";
+            $p[] = "| language Code: |".self::$languageCode."   ";
+            $p[] = "|-------------------------------------------";
+            $p[] = "| from Id:       |".self::$fromId."         ";
+            $p[] = "|-------------------------------------------";
+            $p[] = "| chat Id:       |".self::$chatId."         ";
+            $p[] = "|-------------------------------------------";
+            $p[] = "| marking:       |".self::$marking."        ";
+            $p[] = "|-------------------------------------------";
+            $p[] = "| prompt:        |".self::$prompt."         ";
+            $p[] = "|-------------------------------------------";
+            $p[] = "| response:      |".self::$response."       ";
+            $p[] = "|-------------------------------------------";
+            foreach ($p as $key => $value) {
+                self::printCenteredText($value);
+            }
     }
+
+    private static function printCenteredText($text) {
+        $larguraTela = shell_exec('tput cols');
+        $espacosAntes = (int)ceil(($larguraTela - strlen($text)) / 2);
+
+        print str_repeat(' ', $espacosAntes) . $text . PHP_EOL;
+    }
+
 
 }
 
