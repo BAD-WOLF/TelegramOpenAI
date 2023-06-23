@@ -7,6 +7,7 @@ require_once "ShowOnTerminal.php";
 
 use ReplyTelegram\ReplyTelegram;
 use Telegram\Defaultt\ProcessDefault;
+use TelegramBot\Api\Client;
 use TerminalTelegram\TerminalTelegram;
 
 class Functionalities {
@@ -38,8 +39,9 @@ class Functionalities {
                 break;
             }
 
-            default:{
-                print("entrou no defalut\n");
+             default:{
+                print "\ndefault .......\n";
+                
                 break;
             }
             print "oi";

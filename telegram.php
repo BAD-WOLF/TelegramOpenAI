@@ -1,5 +1,5 @@
 <?php
-require_once "vendor/autoload.php";
+// require_once "vendor/autoload.php";
 require_once "OpenAiHandler.php";
 require_once "functionalities.php";
 
@@ -23,10 +23,11 @@ class TelegramOpenAI {
     }
 
 
-    public function run() {
+    public function Srun() {
        
         $last_update_id = 0;
         while (true) {
+            try {
             $updates = $this->telegram->getUpdates(['offset' => $last_update_id + 1]);
             foreach ($updates as $update) {
                 $this->Update = $update;
@@ -55,8 +56,24 @@ class TelegramOpenAI {
                 }
             }
             sleep(1);
+            } catch(\Throwable $e){
+                print_r(".....\n");
+                $this->run();
+            }
         }
     }
+
+    public function run()
+    {
+        while (true) {
+            try {
+                $this->Srun();
+            } catch (\Throwable $th) {
+                $this->Srun();
+            }
+        }
+    }
+
     /**
      * Gets the value of telegram
      *
@@ -221,9 +238,19 @@ class TelegramOpenAI {
 
 }
 
-$bot = new TelegramOpenAI(
-    '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',
-    '5801896630:AAENUPJKfqp_8PtuE64RRkkPiWz9y2CFcKI'
-);
-$bot->run();
+while (true) {
+    try {
+        $bot = new TelegramOpenAI(
+            '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',
+            '5801896630:AAENUPJKfqp_8PtuE64RRkkPiWz9y2CFcKI'
+        );
+        $bot->run();
+    } catch (\Throwable $th) {
+        $bot = new TelegramOpenAI(
+            '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',
+            '5801896630:AAENUPJKfqp_8PtuE64RRkkPiWz9y2CFcKI'
+        );
+        $bot->run();
+    }
+}
 

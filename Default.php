@@ -46,7 +46,6 @@ class ProcessDefault
             $topic = $this->is_topic();
             print $topic;
             if($topic == 2397 || $topic == 3679){
-                print "se chegou aq fudeu ...";
                 $this->getTelegram()->deleteMessage(
                     $this->getChat_id(),
                     $this->getMessageId()
@@ -63,12 +62,33 @@ class ProcessDefault
              'is_link_hackers'=>$this->is_link_hackers()
             ,'$this->getPrompt()'=>$this->getPrompt()
         ]);die;*/
-        $link = "https://link.hackersthegame.com";
-        if(stripos($this->getPrompt(), $link) !== false){
-            return true;
-        }else{
+
+        $pattern = '/https:\/\/link\.hackersthegame\.com\/\S+/';
+
+        $message = $this->getPrompt();
+
+        if (preg_match($pattern, $message, $matches)) {
+            // O link foi encontrado na mensagem
+            $link = $matches[0];
+            $remainingText = preg_replace($pattern, '', $message);
+
+            // Verificar se há texto além do link
+            if (trim($remainingText) !== '') {
+                print_r("\nlink: $link\n");
+                print_r("nesse caso mandaram alguma coisa a mais...\n");
+                print_r("isso aqui é coisa do {{$this->getUpdate()->getMessage()->getFrom()->getUsername()}}\n");
+                return false;
+            } else {
+                print_r("\nlink foi encontrado somente ele...[200]\n");
+                return true;
+            }
+        } else {
+            // O link não foi encontrado na mensagem
+            print_r("\nlink nao foi encontrado ...\n");
             return false;
         }
+
+
     }
 
     private function is_topic()
